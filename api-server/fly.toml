@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for compressor-tool-aged-field-3599 on 2026-08-17T14:13:38+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'compressor-tool-aged-field-3599'
+primary_region = 'ams'
+
+[build]
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  # ffmpeg jobs are heavy enough that a machine shouldn't take more than a
+  # couple at once — this is what makes the proxy actually spread concurrent
+  # requests across machines (spinning up stopped ones) instead of queueing
+  # everything onto whichever machine is already running.
+  [http_service.concurrency]
+    type = 'requests'
+    soft_limit = 1
+    hard_limit = 2
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1

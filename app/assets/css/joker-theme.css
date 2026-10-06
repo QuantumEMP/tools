@@ -1,0 +1,307 @@
+/* Joker Big Top — tokens and shared printed objects.
+   Values come straight from the brand book's tokens.json; don't tint them. */
+
+/* Decks: Heart is the default, so it also lives on :root. A deck class on
+   <html> (set by the head script in app.vue / useDeck) swaps the table. */
+:root,
+.pal-heart {
+  --base: #141114;
+  --on-base: #ffffff;
+  --primary: #e4202c;
+  --ink: #141114;
+  --drop: #e4202c;
+  color-scheme: dark;
+}
+
+.pal-spade {
+  --base: #0b1442;
+  --on-base: #ffffff;
+  --primary: #2e55ff;
+  --ink: #0b1442;
+  --drop: #2e55ff;
+  color-scheme: dark;
+}
+
+.pal-club {
+  --base: #ffffff;
+  --on-base: #0b1442;
+  --primary: #2e55ff;
+  --ink: #0b1442;
+  --drop: #0b1442;
+  color-scheme: light;
+}
+
+.pal-diamond {
+  --base: #ffffff;
+  --on-base: #141114;
+  --primary: #e4202c;
+  --ink: #141114;
+  --drop: #141114;
+  color-scheme: light;
+}
+
+:root {
+  /* Same in every deck */
+  --gold: #ffc21a;
+  --paper: #ffffff;
+  --suit-red: #e4202c;
+  --suit-black: #0b1442;
+  /* Functional, not brand: the transparency checkerboard behind images, always on paper. */
+  --checker: #e7e9ee;
+
+  --font-display: "DM Serif Display", serif;
+  --font-serif: "DM Serif Text", serif;
+  --font-sans: Comfortaa, sans-serif;
+  --font-kings: Kings, cursive;
+
+  --space-chip: 10px;
+  --space-stack: 16px;
+  --space-gutter: 24px;
+  --space-object: 32px;
+  --space-grid: 56px;
+  --space-block-sm: 72px;
+  --space-block: 120px;
+  --measure: 1120px;
+
+  --radius-note: 6px;
+  --radius-input: 10px;
+  --radius-card: 12px;
+  --radius-ticket: 16px;
+  --radius-panel: 20px;
+  --radius-joker: 22px;
+  --radius-pill: 999px;
+
+  --stroke-chip: 2.5px;
+  --stroke-object: 3px;
+  --stroke-feature: 4px;
+
+  --tilt-note: -2.5deg;
+  --tilt-sticker: 8deg;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--base);
+  color: var(--on-base);
+  font-family: var(--font-sans);
+}
+
+/* Focus: solid gold ring. Inside a gold block gold would vanish, so the ring
+   switches to ink there. */
+:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.blk-gold :focus-visible {
+  outline-color: var(--ink);
+}
+
+/* Colour blocks: a section opts in with one class */
+.blk {
+  background: var(--blk-bg);
+  color: var(--blk-fg);
+  border-top: var(--stroke-feature) solid var(--ink);
+  padding: var(--space-block-sm) 0 80px;
+}
+
+.blk-base { --blk-bg: var(--base); --blk-fg: var(--on-base); --blk-drop: var(--drop); }
+.blk-primary { --blk-bg: var(--primary); --blk-fg: var(--paper); --blk-drop: var(--ink); }
+.blk-gold { --blk-bg: var(--gold); --blk-fg: var(--ink); --blk-drop: var(--ink); }
+.blk-paper { --blk-bg: var(--paper); --blk-fg: var(--ink); --blk-drop: var(--ink); }
+
+@media (min-width: 1024px) {
+  .blk { padding: var(--space-block) 0; }
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--space-gutter);
+}
+
+/* Type */
+.section-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+  line-height: 1.05;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.section-sub {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.object-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.1;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+/* Suits */
+.jk-suit { display: inline-block; width: 1em; height: 1em; flex-shrink: 0; fill: currentColor; }
+.suit-red { color: var(--suit-red); }
+.suit-black { color: var(--suit-black); }
+
+/* Printed object: paper, ink outline, hard shadow */
+.stock {
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--stroke-object) solid var(--ink);
+  box-shadow: 7px 7px 0 var(--blk-drop, var(--ink));
+}
+
+/* Pill button */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border: var(--stroke-object) solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.2;
+  box-shadow: 5px 5px 0 var(--blk-drop, var(--ink));
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--blk-drop, var(--ink)); }
+.btn:active:not(:disabled) { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--blk-drop, var(--ink)); }
+.btn:disabled { cursor: not-allowed; box-shadow: none; transform: translate(5px, 5px); }
+.btn-gold { background: var(--gold); }
+
+/* Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: var(--stroke-chip) solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* Sticker: decorative, one per screen at most */
+.sticker {
+  display: inline-block;
+  padding: 5px 14px;
+  border: var(--stroke-object) solid var(--ink);
+  border-radius: var(--radius-note);
+  background: var(--gold);
+  color: var(--ink);
+  font-family: var(--font-kings);
+  font-size: 28px;
+  line-height: 1.2;
+  rotate: var(--tilt-sticker);
+}
+
+/* Marquee sign: the logo */
+.marquee {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 60px;
+  border: var(--stroke-feature) solid var(--ink);
+  border-radius: var(--radius-ticket);
+  background: var(--primary);
+  color: var(--paper);
+  box-shadow: 6px 6px 0 var(--gold);
+  font-family: var(--font-kings);
+  font-size: 32px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.pal-club .marquee,
+.pal-diamond .marquee { box-shadow: 6px 6px 0 var(--ink); }
+
+.marquee::before {
+  content: "";
+  position: absolute;
+  inset: 6px 10px;
+  background:
+    radial-gradient(circle, var(--gold) 0 3px, transparent 3.5px) top left / 14px 7px repeat-x,
+    radial-gradient(circle, var(--gold) 0 3px, transparent 3.5px) bottom left / 14px 7px repeat-x;
+}
+
+.marquee span { position: relative; }
+
+@media (min-width: 1024px) {
+  .marquee {
+    width: 248px;
+    height: 104px;
+    border-radius: var(--radius-joker);
+    font-size: 58px;
+  }
+
+  .marquee::before {
+    inset: 10px 19px;
+    background:
+      radial-gradient(circle, var(--gold) 0 5px, transparent 5.5px) top left / 25.6px 12px repeat-x,
+      radial-gradient(circle, var(--gold) 0 5px, transparent 5.5px) bottom left / 25.6px 12px repeat-x;
+  }
+}
+
+/* Suit tokens (deck picker) */
+.token {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: var(--stroke-object) solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.token[aria-checked="true"] {
+  background: var(--gold);
+  box-shadow: 5px 5px 0 var(--drop);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
