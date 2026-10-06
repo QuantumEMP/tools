@@ -8,10 +8,10 @@ const tokenRefs = ref<HTMLButtonElement[]>([])
 onMounted(restoreDeck)
 
 const LABELS: Record<Deck, string> = {
-  heart: 'Heart deck',
-  spade: 'Spade deck',
-  club: 'Club deck',
-  diamond: 'Diamond deck'
+  spade: 'Spade deck, dark',
+  club: 'Club deck, light',
+  heart: 'Heart deck, dark',
+  diamond: 'Diamond deck, light'
 }
 
 // Radiogroup keyboard pattern: arrows move and select, focus follows.
@@ -31,8 +31,12 @@ function onKeydown(e: KeyboardEvent, index: number) {
   <div
     class="deck-picker"
     role="radiogroup"
-    aria-label="Pick a deck"
+    aria-label="Pick your deck"
   >
+    <span
+      class="deck-label"
+      aria-hidden="true"
+    >Pick your deck</span>
     <button
       v-for="(d, i) in DECKS"
       :key="d"
@@ -55,6 +59,18 @@ function onKeydown(e: KeyboardEvent, index: number) {
 <style scoped>
 .deck-picker {
   display: flex;
+  align-items: center;
   gap: var(--space-chip);
+}
+
+.deck-label {
+  margin-right: 4px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 18px;
+}
+
+@media (max-width: 639px) {
+  .deck-label { display: none; }
 }
 </style>

@@ -287,7 +287,7 @@ body {
 
 .token[aria-checked="true"] {
   background: var(--gold);
-  box-shadow: 5px 5px 0 var(--drop);
+  box-shadow: 4px 4px 0 var(--drop);
 }
 
 .sr-only {
