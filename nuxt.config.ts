@@ -17,13 +17,22 @@ export default defineNuxtConfig({
     '@nuxt/ui'
   ],
 
+  // `pnpm dev` talks to the local Express server in api-server/.
+  $development: {
+    runtimeConfig: {
+      public: {
+        apiBase: 'http://localhost:8787'
+      }
+    }
+  },
+
   css: ['~/assets/css/joker-theme.css'],
 
+  // The compressor's ffmpeg API on Fly. NUXT_PUBLIC_API_BASE still overrides
+  // either value (see .env.example).
   runtimeConfig: {
     public: {
-      // Overridden per-environment — see .env.example. Falls back to the
-      // local Express server for `npm run dev`.
-      apiBase: 'http://localhost:8787'
+      apiBase: 'https://compressor-tool-aged-field-3599.fly.dev'
     }
   },
 

@@ -13,9 +13,15 @@ import net from 'node:net'
 
 const app = express()
 
-// Lock this down to your actual Cloudflare Pages domain(s) before going live —
-// wildcard '*' is fine for local testing, not for production.
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*').split(',')
+// The site's own origins are always allowed, so the API works without any Fly
+// secrets. ALLOWED_ORIGINS (comma-separated) can add more, e.g. a preview
+// domain. Note: cors() matches array entries exactly, so a '*' in the list
+// would match nothing; it was never a working wildcard here.
+const SITE_ORIGINS = ['https://tools.jok3r.win', 'http://localhost:3000']
+const allowedOrigins = [
+  ...SITE_ORIGINS,
+  ...(process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)
+]
 app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '10kb' }))
 
