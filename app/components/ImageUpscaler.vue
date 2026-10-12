@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import manifest from '~~/public/models/manifest.json'
-import type { ModelInfo } from '~/utils/upscaler-types'
+import type { Fit, ModelInfo } from '~/utils/upscaler-types'
 import { MAX_DIMENSION, MAX_OUTPUT_PIXELS, planPasses, useUpscaler } from '~/composables/useUpscaler'
-import type { Fit, OutputFormat, UpscaleResult } from '~/composables/useUpscaler'
+import type { OutputFormat, UpscaleResult } from '~/composables/useUpscaler'
 
 const MAX_UPLOAD_MB = 50
 const models: ModelInfo[] = manifest.models.map(m => ({ ...m, parts: m.parts.map(p => `/models/${p}`) }))

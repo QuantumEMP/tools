@@ -1,6 +1,5 @@
-import type { ModelInfo, RawImage, WorkerRequest, WorkerResponse } from '~/utils/upscaler-types'
+import type { Fit, ModelInfo, RawImage, WorkerRequest, WorkerResponse } from '~/utils/upscaler-types'
 
-export type Fit = 'fill' | 'cover' | 'contain'
 export type OutputFormat = 'png' | 'jpeg' | 'webp'
 
 export interface UpscaleOptions {
@@ -38,12 +37,6 @@ export function planPasses(ratio: number, inputPixels: number) {
   return passes
 }
 
-let picaInstance: Promise<import('pica').Pica> | undefined
-function getPica() {
-  picaInstance ??= import('pica').then(({ Pica }) => new Pica({ features: ['js', 'wasm', 'ww'] }))
-  return picaInstance
-}
-
 function makeCanvas(width: number, height: number) {
   const c = document.createElement('canvas')
   c.width = width
@@ -63,7 +56,7 @@ export function useUpscaler() {
   }
 
   function runWorker(req: WorkerRequest, transfer: Transferable[]) {
-    return new Promise<{ image: RawImage, backend: 'webgpu' | 'wasm' }>((resolve, reject) => {
+    return new Promise<{ image: RawImage, backend?: 'webgpu' | 'wasm' }>((resolve, reject) => {
       const w = getWorker()
       w.onmessage = (e: MessageEvent<WorkerResponse>) => {
         const msg = e.data
@@ -89,62 +82,36 @@ export function useUpscaler() {
     const ratio = Math.max(width / source.width, height / source.height)
     const passes = planPasses(ratio, source.width * source.height)
 
-    let canvas = makeCanvas(source.width, source.height)
+    // The only canvas readback. Fingerprinting protection may add faint noise
+    // here, but nothing after this point depends on reading a canvas back.
+    const canvas = makeCanvas(source.width, source.height)
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!
     ctx.drawImage(source, 0, 0)
-    let usedBackend: UpscaleResult['backend'] = 'none'
+    const imageData = ctx.getImageData(0, 0, source.width, source.height)
+    const raw: RawImage = { width: imageData.width, height: imageData.height, data: imageData.data }
+    const { image, backend: b } = await runWorker(
+      { type: 'upscale', model: toRaw(opts.model), image: raw, passes, target: { width, height, fit } },
+      [raw.data.buffer]
+    )
+    const usedBackend: UpscaleResult['backend'] = b ?? 'none'
 
-    if (passes > 0) {
-      const imageData = ctx.getImageData(0, 0, source.width, source.height)
-      const raw: RawImage = { width: imageData.width, height: imageData.height, data: imageData.data }
-      const { image, backend: b } = await runWorker(
-        { type: 'upscale', model: toRaw(opts.model), image: raw, passes },
-        [raw.data.buffer]
-      )
-      usedBackend = b
-      canvas = makeCanvas(image.width, image.height)
-      canvas.getContext('2d')!.putImageData(new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height), 0, 0)
+    // For contain, the worker returns the fitted image; centre it on the full canvas.
+    const final = makeCanvas(width, height)
+    const fctx = final.getContext('2d')!
+    if (opts.format === 'jpeg') {
+      fctx.fillStyle = '#000'
+      fctx.fillRect(0, 0, width, height)
     }
-
-    stage.value = 'Resizing to target resolution'
-    progress.value = 1
-
-    // Work out source crop (cover) and destination rect (contain).
-    let sx = 0, sy = 0, sw = canvas.width, sh = canvas.height
-    let dw = width, dh = height
-    if (fit === 'cover') {
-      const s = Math.max(width / sw, height / sh)
-      const cw = Math.round(width / s)
-      const ch = Math.round(height / s)
-      sx = Math.floor((sw - cw) / 2)
-      sy = Math.floor((sh - ch) / 2)
-      sw = cw
-      sh = ch
-    } else if (fit === 'contain') {
-      const s = Math.min(width / sw, height / sh)
-      dw = Math.max(1, Math.round(sw * s))
-      dh = Math.max(1, Math.round(sh * s))
-    }
-
-    let src = canvas
-    if (sx || sy || sw !== canvas.width || sh !== canvas.height) {
-      src = makeCanvas(sw, sh)
-      src.getContext('2d')!.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh)
-    }
-
-    const pica = await getPica()
-    const resized = makeCanvas(dw, dh)
-    await pica.resize(src, resized, { filter: 'lanczos3' })
-
-    let final = resized
-    if (dw !== width || dh !== height || opts.format === 'jpeg') {
-      final = makeCanvas(width, height)
-      const fctx = final.getContext('2d')!
-      if (opts.format === 'jpeg') {
-        fctx.fillStyle = '#000'
-        fctx.fillRect(0, 0, width, height)
-      }
-      fctx.drawImage(resized, Math.floor((width - dw) / 2), Math.floor((height - dh) / 2))
+    const pixels = new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height)
+    const dx = Math.floor((width - image.width) / 2)
+    const dy = Math.floor((height - image.height) / 2)
+    if (opts.format === 'jpeg' || dx || dy) {
+      // putImageData ignores compositing, so go via a canvas to keep the black JPEG backdrop.
+      const tmp = makeCanvas(image.width, image.height)
+      tmp.getContext('2d')!.putImageData(pixels, 0, 0)
+      fctx.drawImage(tmp, dx, dy)
+    } else {
+      fctx.putImageData(pixels, 0, 0)
     }
 
     stage.value = 'Encoding'

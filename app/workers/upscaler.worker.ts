@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import * as ort from 'onnxruntime-web/webgpu'
-import type { WorkerRequest, WorkerResponse } from '~/utils/upscaler-types'
+import { Pica } from 'pica'
+import type { RawImage, ResizeTarget, WorkerRequest, WorkerResponse } from '~/utils/upscaler-types'
 
 // The WebGPU wasm binary is larger than Cloudflare's 25 MiB static-asset limit,
 // so load the runtime from jsDelivr (pinned to the installed version, CORS + CORP enabled).
@@ -170,34 +171,88 @@ async function upscalePass(
   return { width: ow, height: oh, data: out }
 }
 
+// Buffer-only Pica: no canvas, so browser fingerprinting protection can't break it.
+let pica: Pica | undefined
+
+/**
+ * Crops (cover) and Lanczos-resizes to the target. For contain, the result is the
+ * fitted image; the caller centres it on the full-size canvas.
+ */
+async function resizeToTarget(img: RawImage, { width, height, fit }: ResizeTarget): Promise<RawImage> {
+  let sx = 0, sy = 0, sw = img.width, sh = img.height
+  let dw = width, dh = height
+  if (fit === 'cover') {
+    const s = Math.max(width / sw, height / sh)
+    const cw = Math.min(sw, Math.round(width / s))
+    const ch = Math.min(sh, Math.round(height / s))
+    sx = Math.floor((sw - cw) / 2)
+    sy = Math.floor((sh - ch) / 2)
+    sw = cw
+    sh = ch
+  } else if (fit === 'contain') {
+    const s = Math.min(width / sw, height / sh)
+    dw = Math.max(1, Math.round(sw * s))
+    dh = Math.max(1, Math.round(sh * s))
+  }
+
+  let src = img.data
+  if (sx || sy || sw !== img.width || sh !== img.height) {
+    src = new Uint8ClampedArray(sw * sh * 4)
+    for (let y = 0; y < sh; y++) {
+      const o = ((sy + y) * img.width + sx) * 4
+      src.set(img.data.subarray(o, o + sw * 4), y * sw * 4)
+    }
+  }
+  if (sw === dw && sh === dh) return { width: dw, height: dh, data: src }
+
+  pica ??= new Pica({ features: ['js', 'wasm'] })
+  const out = await pica.resizeBuffer({ src, width: sw, height: sh, toWidth: dw, toHeight: dh, filter: 'lanczos3' })
+  return { width: dw, height: dh, data: new Uint8ClampedArray(out.buffer, out.byteOffset, out.length) }
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const req = e.data
   if (req.type !== 'upscale') return
   try {
-    const { session, backend } = await getSession(req)
-    const tile = backend === 'webgpu' ? req.model.tile : Math.min(req.model.tile, 128)
-
     let img = req.image
-    // Count tiles across all passes for an overall progress figure.
-    let totalTiles = 0
-    let pw = img.width
-    let ph = img.height
-    for (let i = 0; i < req.passes; i++) {
-      totalTiles += Math.ceil(pw / tile) * Math.ceil(ph / tile)
-      pw *= 4
-      ph *= 4
+    let backend: 'webgpu' | 'wasm' | undefined
+    if (req.passes > 0) {
+      const current = await getSession(req)
+      backend = current.backend
+      img = await upscaleAll(current.session, current.backend, img, req)
     }
-    let doneTiles = 0
-    for (let i = 0; i < req.passes; i++) {
-      const stage = `AI upscaling${req.passes > 1 ? ` pass ${i + 1}/${req.passes}` : ''} (${backend === 'webgpu' ? 'WebGPU' : 'CPU'})`
-      post({ type: 'progress', stage, progress: doneTiles / totalTiles })
-      img = await upscalePass(session, img, tile, () => {
-        doneTiles++
-        post({ type: 'progress', stage, progress: doneTiles / totalTiles })
-      })
-    }
+    post({ type: 'progress', stage: 'Resizing to target resolution', progress: 1 })
+    img = await resizeToTarget(img, req.target)
     post({ type: 'done', image: img, backend }, [img.data.buffer])
   } catch (err) {
     post({ type: 'error', message: err instanceof Error ? err.message : String(err) })
   }
+}
+
+async function upscaleAll(
+  session: ort.InferenceSession,
+  backend: 'webgpu' | 'wasm',
+  img: RawImage,
+  req: Extract<WorkerRequest, { type: 'upscale' }>
+) {
+  const tile = backend === 'webgpu' ? req.model.tile : Math.min(req.model.tile, 128)
+  // Count tiles across all passes for an overall progress figure.
+  let totalTiles = 0
+  let pw = img.width
+  let ph = img.height
+  for (let i = 0; i < req.passes; i++) {
+    totalTiles += Math.ceil(pw / tile) * Math.ceil(ph / tile)
+    pw *= 4
+    ph *= 4
+  }
+  let doneTiles = 0
+  for (let i = 0; i < req.passes; i++) {
+    const stage = `AI upscaling${req.passes > 1 ? ` pass ${i + 1}/${req.passes}` : ''} (${backend === 'webgpu' ? 'WebGPU' : 'CPU'})`
+    post({ type: 'progress', stage, progress: doneTiles / totalTiles })
+    img = await upscalePass(session, img, tile, () => {
+      doneTiles++
+      post({ type: 'progress', stage, progress: doneTiles / totalTiles })
+    })
+  }
+  return img
 }
