@@ -3,10 +3,12 @@ import type { Suit } from '~/components/SuitIcon.vue'
 
 useSeoMeta({
   title: 'The big top',
-  description: 'Two acts, one tent: shrink images and video, or blow small pictures up big. Everything runs in your browser.'
+  description: 'Three acts, one tent: shrink images and video, blow small pictures up big, or send a file that burns after one download.'
 })
 
-const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string }[] = [
+const { public: { transferUrl } } = useRuntimeConfig()
+
+const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string, external?: boolean }[] = [
   {
     to: '/compress',
     suit: 'spade',
@@ -20,6 +22,16 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
     title: 'The strongman',
     blurb: 'Lifts small pictures into big ones with Real-ESRGAN, up to 8K, on your own device. Your images never leave the tent.',
     cta: 'Lift something'
+  },
+  {
+    // Its own Worker (D1, R2, email, cron) on a route in front of this Pages
+    // site, so it must be a full page load, not a client-side hop.
+    to: transferUrl,
+    external: true,
+    suit: 'club',
+    title: 'The vanishing act',
+    blurb: 'Send a file by email, encrypted in your browser before it leaves. It burns after one download, or after a few days if nobody comes.',
+    cta: 'Make it vanish'
   }
 ]
 </script>
@@ -43,7 +55,7 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
           The big top
         </h1>
         <p class="section-sub jk-hero-sub">
-          Two acts, one tent. Pick a show: everything runs right here in your browser.
+          Three acts, one tent. Pick a show: the work happens right here in your browser.
         </p>
       </div>
     </section>
@@ -54,6 +66,7 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
           v-for="act in ACTS"
           :key="act.to"
           :to="act.to"
+          :external="act.external"
           class="stock jk-act"
         >
           <SuitIcon
@@ -118,6 +131,10 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
   .jk-acts { grid-template-columns: 1fr 1fr; }
 }
 
+@media (min-width: 1024px) {
+  .jk-acts { grid-template-columns: repeat(3, 1fr); }
+}
+
 /* The whole card is the link; the pill inside is only its visual cue. */
 .jk-act {
   display: flex;
@@ -132,8 +149,9 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.jk-act:nth-child(2) { rotate: 1.5deg; }
 .jk-act:nth-child(1) { rotate: -1.5deg; }
+.jk-act:nth-child(2) { rotate: 1.5deg; }
+.jk-act:nth-child(3) { rotate: -1deg; }
 
 .jk-act:hover {
   transform: translate(-3px, -3px);
