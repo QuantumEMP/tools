@@ -32,7 +32,10 @@ export default defineNuxtConfig({
   // either value (see .env.example).
   runtimeConfig: {
     public: {
-      apiBase: 'https://compressor-tool-aged-field-3599.fly.dev'
+      apiBase: 'https://compressor-tool-aged-field-3599.fly.dev',
+      // The file transfer tool (QuantumEMP/file-transfer-tool) is a separate
+      // Worker. NUXT_PUBLIC_TRANSFER_URL overrides it.
+      transferUrl: 'https://file.jok3r.win'
     }
   },
 

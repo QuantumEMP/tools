@@ -1,12 +1,13 @@
 # Joker
 
-Two browser tools under one big top, built with Nuxt 4 + Nuxt UI and deployed to Cloudflare Pages.
+Three tools under one big top, built with Nuxt 4 + Nuxt UI and deployed to Cloudflare Pages.
 
 | Route | Act | What it does |
 | --- | --- | --- |
 | `/` | The big top | Landing page |
 | `/compress` | The shrinking act | Compresses images (WebP, AVIF, JPEG, PNG) and video (MP4, WebM), including bulk import from a CSV of URLs |
 | `/upscale` | The strongman | Upscales images to an exact resolution with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), entirely on the user's device |
+| [file.jok3r.win](https://file.jok3r.win) | The vanishing act | Sends a file by email, encrypted end to end, and burns it after one download. A separate Worker, see [QuantumEMP/file-transfer-tool](https://github.com/QuantumEMP/file-transfer-tool) |
 
 ## Development
 
