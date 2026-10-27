@@ -7,7 +7,7 @@ Three tools under one big top, built with Nuxt 4 + Nuxt UI and deployed to Cloud
 | `/` | The big top | Landing page |
 | `/compress` | The shrinking act | Compresses images (WebP, AVIF, JPEG, PNG) and video (MP4, WebM), including bulk import from a CSV of URLs |
 | `/upscale` | The strongman | Upscales images to an exact resolution with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), entirely on the user's device |
-| [file.jok3r.win](https://file.jok3r.win) | The vanishing act | Sends a file by email, encrypted end to end, and burns it after one download. A separate Worker, see [QuantumEMP/file-transfer-tool](https://github.com/QuantumEMP/file-transfer-tool) |
+| `/send` | The vanishing act | Sends a file by email, encrypted end to end, and burns it after one download. Not part of this build, see below |
 
 ## Development
 
@@ -18,6 +18,14 @@ pnpm dev                      # http://localhost:3000
 
 The compressor talks to the Express/ffmpeg API in `api-server/` (run it locally on port 8787, or set
 `NUXT_PUBLIC_API_BASE`, see `.env.example`). The upscaler needs no server.
+
+## The vanishing act (`/send`)
+
+The file transfer tool lives in [QuantumEMP/file-transfer-tool](https://github.com/QuantumEMP/file-transfer-tool). It needs
+D1, R2, email and a cron trigger, which Pages can't run, so it deploys as its own Cloudflare Worker with a route for
+`tools.jok3r.win/send*`. That route sits in front of this Pages deploy, so `/send` never reaches it. The landing page
+links there with a full page load (`external`), and the Worker carries its own copy of the Joker theme. Under `pnpm dev`
+the card's link 404s unless `NUXT_PUBLIC_TRANSFER_URL` points at a running copy.
 
 ## How the upscaler works
 

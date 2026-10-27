@@ -8,7 +8,7 @@ useSeoMeta({
 
 const { public: { transferUrl } } = useRuntimeConfig()
 
-const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string }[] = [
+const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string, external?: boolean }[] = [
   {
     to: '/compress',
     suit: 'spade',
@@ -24,8 +24,10 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
     cta: 'Lift something'
   },
   {
-    // Its own Worker (D1, R2, email, cron), so it lives on its own subdomain.
+    // Its own Worker (D1, R2, email, cron) on a route in front of this Pages
+    // site, so it must be a full page load, not a client-side hop.
     to: transferUrl,
+    external: true,
     suit: 'club',
     title: 'The vanishing act',
     blurb: 'Send a file by email, encrypted in your browser before it leaves. It burns after one download, or after a few days if nobody comes.',
@@ -64,6 +66,7 @@ const ACTS: { to: string, suit: Suit, title: string, blurb: string, cta: string 
           v-for="act in ACTS"
           :key="act.to"
           :to="act.to"
+          :external="act.external"
           class="stock jk-act"
         >
           <SuitIcon
