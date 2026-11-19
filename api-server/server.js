@@ -72,8 +72,19 @@ const FORMATS = {
   webm: { ext: 'webm', codec: 'libvpx-vp9', mime: 'video/webm' }
 }
 
-// video needs a real file on disk for ffmpeg, so use disk storage here instead of memory
-const videoUpload = multer({ dest: tmpdir() })
+// video needs a real file on disk for ffmpeg, so use disk storage here instead of memory.
+// The cap keeps one upload from filling the machine's ephemeral disk (the upload
+// and the encoded output both live in tmpdir until the response finishes).
+const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024
+const videoUpload = multer({ dest: tmpdir(), limits: { fileSize: MAX_VIDEO_BYTES, files: 1 } })
+
+// The VM has 1 GB of RAM. A 4K source through libx264 peaks around 1.2-1.7 GB
+// (decoded frames + lookahead), which gets ffmpeg OOM-killed, so frames are
+// scaled to fit within 1920px on the long edge and threads are capped. 1080p
+// sources stay under ~400 MB. Never upscales; -2 keeps dimensions even.
+const MAX_EDGE = 1920
+const SCALE_FILTER =
+  `scale='if(gte(iw,ih),min(${MAX_EDGE},iw),-2)':'if(gte(iw,ih),-2,min(${MAX_EDGE},ih))'`
 
 app.post('/compress-video', videoUpload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' })
@@ -85,14 +96,33 @@ app.post('/compress-video', videoUpload.single('file'), async (req, res) => {
 
   const inputPath = req.file.path
   const outputPath = join(tmpdir(), `${randomUUID()}-compressed.${target.ext}`)
+  const cleanupOutput = () => unlink(outputPath).catch(() => {})
+
+  // If the client gives up (closes the tab, cancels), stop encoding instead of
+  // burning CPU and disk on a result nobody will download.
+  let cmd
+  let clientGone = false
+  res.on('close', () => {
+    if (!res.writableFinished) {
+      clientGone = true
+      cmd?.kill('SIGKILL')
+    }
+  })
 
   try {
     await new Promise((resolve, reject) => {
-      const cmd = ffmpeg(inputPath)
+      cmd = ffmpeg(inputPath)
+        .inputOptions(['-threads 2'])
         .videoCodec(target.codec)
-        .outputOptions([`-crf ${crf}`, `-preset ${preset}`])
+        .videoFilters(SCALE_FILTER)
+        // 8-bit 4:2:0 keeps memory down and makes phone HDR/10-bit sources
+        // play everywhere (libx264 would otherwise emit High 10).
+        .outputOptions([`-crf ${crf}`, `-preset ${preset}`, '-pix_fmt yuv420p', '-threads 2'])
         .audioCodec('aac')
 
+      if (target.codec === 'libx264') {
+        cmd.outputOptions(['-movflags +faststart'])
+      }
       if (target.codec === 'libvpx-vp9') {
         cmd.outputOptions(['-b:v 0', '-deadline good', '-cpu-used 2'])
         cmd.audioCodec('libopus')
@@ -101,20 +131,31 @@ app.post('/compress-video', videoUpload.single('file'), async (req, res) => {
       cmd.save(outputPath).on('end', resolve).on('error', reject)
     })
 
+    if (clientGone) {
+      cleanupOutput()
+      return
+    }
+
     res.set('Content-Type', target.mime)
     res.set('Content-Disposition', `attachment; filename="compressed.${target.ext}"`)
     const stream = createReadStream(outputPath)
     stream.pipe(res)
-    stream.on('close', () => {
-      unlink(outputPath).catch(() => {})
-    })
+    // pipe() doesn't destroy the source when the client disconnects, so without
+    // this an aborted download leaves the file (and its fd) behind.
+    res.on('close', () => stream.destroy())
+    stream.on('close', cleanupOutput)
   } catch (err) {
+    cleanupOutput()
+    if (clientGone) return
     console.error(err)
     const killedBySignal = /killed with signal/i.test(err.message || '')
-    res.status(killedBySignal ? 507 : 500).json({
-      error: killedBySignal
-        ? 'The server ran out of memory encoding this video — try a smaller file or lower quality.'
-        : 'Video compression failed'
+    const noSpace = /No space left on device/i.test(err.message || '')
+    res.status(killedBySignal || noSpace ? 507 : 500).json({
+      error: noSpace
+        ? 'The server ran out of disk space encoding this video. Please try again in a minute.'
+        : killedBySignal
+          ? 'The server ran out of memory encoding this video. Try a smaller file or lower quality.'
+          : 'Video compression failed'
     })
   } finally {
     unlink(inputPath).catch(() => {})
@@ -260,6 +301,19 @@ app.post('/fetch-image', async (req, res) => {
     if (status >= 500) console.error(err)
     res.status(status).json({ error: err.message || 'Failed to fetch image' })
   }
+})
+
+// Upload errors (e.g. over the size cap) come from multer via next(err); without
+// this Express answers with an HTML 500 the client can't show.
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError) {
+    const tooBig = err.code === 'LIMIT_FILE_SIZE'
+    return res.status(tooBig ? 413 : 400).json({
+      error: tooBig ? 'That file is too big. The limit is 2 GB.' : err.message
+    })
+  }
+  console.error(err)
+  res.status(500).json({ error: 'Something went wrong' })
 })
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
